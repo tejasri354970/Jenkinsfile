@@ -1,0 +1,68 @@
+pipeline {
+    agent any
+    
+    environment {
+        DOCKER_HUB_CREDENTIALS = credentials('docker-hub-credentials-id') // Replace with your Docker Hub credentials ID
+    }
+
+    stages {
+        stage('Checkout Code') {
+            steps {
+                checkout scm
+            }
+        }
+
+        stage('Build') {
+            steps {
+                sh 'mvn clean install'  // Replace with your build command
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    def dockerImage = docker.build("your-docker-image-name:${env.BUILD_NUMBER}")
+                    docker.withRegistry('https://registry.hub.docker.com', 'Docker Hub') {
+                        dockerImage.push()
+                    }
+                }
+            }
+        }
+
+        stage('Deploy Docker Image') {
+            steps {
+                script {
+                    docker.withRegistry('https://registry.hub.docker.com', 'Docker Hub') {
+                        sh 'docker pull your-docker-image-name:${env.BUILD_NUMBER}'
+                    }
+                }
+            }
+        }
+
+        stage('Run Terraform Script') {
+            steps {
+                script {
+                    sh 'terraform init'
+                    sh 'terraform apply -auto-approve'
+                }
+            }
+        }
+
+        stage('Deploy to Server') {
+            steps {
+                // Add your deployment steps here
+                // This could include copying files, restarting services, etc.
+                // Example: sh 'scp -r your-app-files user@your-server:/path/to/deployment/'
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Pipeline succeeded! Clean up resources if necessary.'
+        }
+        failure {
+            echo 'Pipeline failed! Handle failure scenarios.'
+        }
+    }
+}
